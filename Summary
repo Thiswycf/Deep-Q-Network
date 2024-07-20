@@ -1,0 +1,8 @@
+深度强化学习（Deep Reinforcement Learning）
+DoubleDQN（以 gym 的 CartPole-v1 环境为例）
+
+总结：
+    1. 逐渐改变目标网络，而不是 隔段时间直接复制网络 （更加稳定
+    2. SmoothL1Loss(Huber) 损失函数，而不是 MSELoss （更加稳定、鲁棒
+    3. 使用 torch.nn.utils.clip_grad_value_ 函数裁剪梯度，防止梯度爆炸
+    4. 回放经验的 MEMORY_SIZE 取 BATCH_SIZE 的平方效果比较好
