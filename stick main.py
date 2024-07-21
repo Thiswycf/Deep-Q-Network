@@ -36,7 +36,15 @@ class QNetwork(nn.Module):
         self.fc = nn.Sequential(*self.fc)
     
     def forward(self, x):
-        return self.fc(x)
+        residual = 0
+        for f in self.fc:
+            if isinstance(f, nn.Linear) and f != self.fc[0]:
+                x = x + residual
+                residual = x
+                pass
+            x = f(x)
+        return x
+        # return self.fc(x)
 
 # Replay Memory
 class ReplayMemory:
@@ -177,7 +185,7 @@ def plot_durations(show_result=False):
 
     fig.tight_layout()  # 确保两个 y 轴标签不重叠
     fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.9))  # 显示图例并调整其位置
-    plt.savefig(f'bs{BATCH_SIZE} ms{MEMORY_SIZE} num1000 {ENV_NAME} {NN_WIDTH}WIDTH {NN_DEPTH}DEPTH.png')
+    plt.savefig(f'{ENV_NAME} {NN_WIDTH}WIDTH {NN_DEPTH}DEPTH.png')
     
     plt.close(fig)
            
