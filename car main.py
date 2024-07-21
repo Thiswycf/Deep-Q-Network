@@ -49,11 +49,13 @@ class QNetwork(nn.Module):
 # Replay Memory
 class ReplayMemory:
     def __init__(self, capacity):
-        self.memory = deque(maxlen=capacity)
+        self.memorySet = set()
+        self.memory = deque([], maxlen=capacity)
     
     def push(self, state, action, reward, next_state, done):
-        if len(self.memory) == self.memory.maxlen:
+        if len(self.memory) == self.memory.maxlen or (state, action, reward, next_state, done) in self.memorySet:
             return
+        self.memorySet.add((state, action, reward, next_state, done))
         self.memory.append((state, action, reward, next_state, done))
     
     def sample(self, batch_size):
@@ -97,9 +99,10 @@ class DQNAgent:
             return torch.tensor([[random.randrange(self.action_dim)]], device=device, dtype=torch.long)
     
     def optimize_model(self, t):
-        if len(self.memory) < BATCH_SIZE:
+        batch_size = int(RECALL_RATIO * len(self.memory))
+        if len(self.memory) < batch_size or batch_size == 0:
             return
-        transitions = self.memory.sample(BATCH_SIZE)
+        transitions = self.memory.sample(batch_size)
         batch_state, batch_action, batch_reward, batch_next_state, batch_done = zip(*transitions)
 
         batch_state = [a.unsqueeze(0) for a in batch_state]
@@ -185,7 +188,7 @@ def plot_durations(show_result=False):
 
     fig.tight_layout()  # 确保两个 y 轴标签不重叠
     fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.9))  # 显示图例并调整其位置
-    plt.savefig(f'bs{BATCH_SIZE} ms{MEMORY_SIZE} {ENV_NAME} {NN_WIDTH}WIDTH {NN_DEPTH}DEPTH.png')
+    plt.savefig(f'ms{MEMORY_SIZE} rr{RECALL_RATIO} {ENV_NAME} {NN_WIDTH}WIDTH {NN_DEPTH}DEPTH.png')
     
     plt.close(fig)
            
