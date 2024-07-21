@@ -48,14 +48,16 @@ class QNetwork(nn.Module):
 
 # Replay Memory
 class ReplayMemory:
-    def __init__(self, capacity):
-        self.memorySet = set()
-        self.memory = deque([], maxlen=capacity)
+    def __init__(self, capacity, agent):
+        self.memory = deque(maxlen=capacity)
+        self.agent = agent
     
-    def push(self, state, action, reward, next_state, done):
-        if len(self.memory) == self.memory.maxlen or (state, action, reward, next_state, done) in self.memorySet:
-            return
-        self.memorySet.add((state, action, reward, next_state, done))
+    def push(self, state, action, reward, next_state, done, isRandomChose):
+        if len(self.memory) == self.memory.maxlen:
+            if isRandomChose or random.random() < self.agent.epsilon:
+                self.memory.popleft()
+            else:
+                return
         self.memory.append((state, action, reward, next_state, done))
     
     def sample(self, batch_size):
@@ -85,7 +87,7 @@ class DQNAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
         self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=LR, amsgrad=True)
-        self.memory = ReplayMemory(MEMORY_SIZE)
+        self.memory = ReplayMemory(MEMORY_SIZE, self)
         self.steps_done = 0
         self.epsilon = EPSILON_START
     
@@ -94,15 +96,14 @@ class DQNAgent:
         self.epsilon = EPSILON_END + (EPSILON_START - EPSILON_END) * np.exp(-1. * self.steps_done / EPSILON_DECAY)
         if random.random() > self.epsilon:
             with torch.no_grad():
-                return self.policy_net(state).max(0)[1].view(1, 1)
+                return False, self.policy_net(state).max(0)[1].view(1, 1)
         else:
-            return torch.tensor([[random.randrange(self.action_dim)]], device=device, dtype=torch.long)
+            return True, torch.tensor([[random.randrange(self.action_dim)]], device=device, dtype=torch.long)
     
     def optimize_model(self, t):
-        batch_size = int(RECALL_RATIO * len(self.memory))
-        if len(self.memory) < batch_size or batch_size == 0:
+        if len(self.memory) < BATCH_SIZE:
             return
-        transitions = self.memory.sample(batch_size)
+        transitions = self.memory.sample(BATCH_SIZE)
         batch_state, batch_action, batch_reward, batch_next_state, batch_done = zip(*transitions)
 
         batch_state = [a.unsqueeze(0) for a in batch_state]
@@ -188,7 +189,7 @@ def plot_durations(show_result=False):
 
     fig.tight_layout()  # 确保两个 y 轴标签不重叠
     fig.legend(loc='upper left', bbox_to_anchor=(0.1, 0.9))  # 显示图例并调整其位置
-    plt.savefig(f'ms{MEMORY_SIZE} rr{RECALL_RATIO} {ENV_NAME} {NN_WIDTH}WIDTH {NN_DEPTH}DEPTH.png')
+    plt.savefig(f'action随机一定存取，否则依据epsilon存取 ep_end{EPSILON_END} bs{BATCH_SIZE} ms{MEMORY_SIZE} {ENV_NAME} {NN_WIDTH}WIDTH {NN_DEPTH}DEPTH.png')
     
     plt.close(fig)
            
@@ -198,7 +199,7 @@ try:
         state = torch.tensor(state[0], device=device, dtype=torch.float32)
         
         for t in count(start=1):
-            action = agent.select_action(state)
+            isRandomChose, action = agent.select_action(state)
             next_state, reward, isDone, isTruncated, _ = env.step(action.item())
   
             if DEBUG:
@@ -239,7 +240,7 @@ try:
             reward = torch.tensor(np.array([reward]), device=device, dtype=torch.float32)
             isDone = torch.tensor(np.array([isDone]), device=device, dtype=torch.float32)
             
-            agent.memory.push(state, action, reward, next_state, isDone)
+            agent.memory.push(state, action, reward, next_state, isDone, isRandomChose)
             state = next_state
             
             agent.optimize_model(t)
@@ -253,7 +254,7 @@ try:
                 break
 
 except KeyboardInterrupt:
-    print('Interrupt train.')
+    print('Interrupt.')
     pass
 
 finally:

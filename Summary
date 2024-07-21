@@ -1,8 +1,24 @@
 深度强化学习（Deep Reinforcement Learning）
-DoubleDQN（以 gym 的 CartPole-v1 环境为例）
+DoubleDQN（策略网络 PolicyNet 和 目标网络 TargetNet）
 
+gym 的 CartPole-v1 环境
 总结：
     1. 逐渐改变目标网络，而不是 隔段时间直接复制网络 （更加稳定
     2. SmoothL1Loss(Huber) 损失函数，而不是 MSELoss （更加稳定、鲁棒
     3. 使用 torch.nn.utils.clip_grad_value_ 函数裁剪梯度，防止梯度爆炸
     4. 回放经验的 MEMORY_SIZE 取 BATCH_SIZE 的平方效果比较好
+
+
+gym 的 MountainCar-v0 环境
+总结：
+    1. 与CartPole-v1环境不一样的是，它需要依赖随机性到达终点，从而优化网络
+    2. 需要调整 ReplayMemory（回放经验） 策略，若滚动（同CartPole-v1），则后期会出现记忆的单一性，
+        因为主要存在在初期的多样性记忆被冲走（猜想，因为初期epsilon较大）,
+        若达到终点的记忆被冲完，那么就会出现表现急速衰退的现象
+    3. 不滚动的情况下，则需要较大内存空间来保证随机到达终点的记忆能被保留
+    4. 想到了一种新ReplayMemory策略，考虑到在线训练的ReplayMemory大小不能总是很大的
+        （离线训练当然可以很大），可以采取后期加入随机动作、概率加入最优动作从而避免记忆单一性，
+        即 内存队列未满情况下直接存取，而内存队列已满情况下弹出最前记忆，
+        action随机时一定存取，否则依据agent.epsilon存取
+        （在EPSILON_END取0.01时表现不错，但0.005和0.001时表现很不稳定）
+
